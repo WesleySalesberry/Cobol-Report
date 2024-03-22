@@ -85,6 +85,7 @@
        01 END-OF-PROGRAMS-CSR        PIC A(01)  VALUE 'N'.
        01 END-OF-NHMENT-PROG-CSR     PIC A(01)  VALUE 'N'.
        01 END-OF-PROGECT-CSR         PIC A(01)  VALUE 'N'.
+       01 END-OF-COMPONENTS-CSR      PIC A(01)  VALUE 'N'.
           
        77 SAVE-NHMPROG-IDX USAGE IS INDEX.
        77 SAVE-NHMENT-PROJ-WC-IDX USAGE IS INDEX.
@@ -545,6 +546,7 @@
            PERFORM UNTIL END-OF-PROGECT-CSR IS EQUAL TO 'Y'
       *          Create the rest of the routines 
                    PERFORM 720-GET-NHMPROG    
+                   PERFORM 730-GET-COMPONENTS
                    PERFORM 705-FETCH-ICTO-PROJECTS
            END-PERFORM.
 
@@ -567,11 +569,13 @@
            IF REGION-CODE IS EQUAL TO 'L' THEN
               EXEC SQL
                    FETCH LON-ICTO-PROJECT-CSR
+                   INTO CSR-PROJECT
                    END-EXEC
               MOVE 'ICTO Lon SQL Fetch Error' TO SQL-MSG
            ELSE
               EXEC SQL
                    FETCH NYC-ICTO-PROJECT-CSR
+                   INTO CSR-PROJECT
                    END-EXEC
               MOVE 'ICTO NYC SQL Fetch Error' TO SQL-MSG
            END-IF.
@@ -593,6 +597,62 @@
                    END-IF
                    SET NHMPROG-IDX UP BY 1
            END-PERFORM.
+
+       730-GET-COMPONENTS.
+           EXEC SQL
+                DECLARE COMPONENTS-CSR CURSOR FOR
+                SELECT COMPONENT_ID,
+                DESCRIPTION,
+                EXEC_ENVIRON,
+                LANGUAGE,
+                DB2_USAGE,
+                PROJECT
+                FROM COMPONENT
+                WHERE PROJECT = CSR-PROJECT
+                AND EXEC_ENVIRON LIKE 'M%'
+                ORDER BY COMPONENT_ID
+                END-EXEC.
+
+           EXEC SQL
+                OPEN COMPONENTS-CSR
+                END-EXEC.
+
+           MOVE 'Components SQL Open Curser Error' TO SQL-MSG.
+           PERFORM 910-CHECK-SQL-CODE.
+           MOVE 'N' TO END-OF-COMPONENTS-CSR.
+           PERFORM 735-FETCH-COMPONENTS.
+
+           PERFORM UNTIL END-OF-COMPONENTS-CSR IS EQUAL TO 'Y'
+      *       TODO: Write Components Here
+                   PERFORM 735-FETCH-COMPONENTS
+           END-PERFORM.
+
+           EXEC SQL
+                CLOSE COMPONENTS-CSR
+                END-EXEC.
+
+           MOVE 'Components SQL Close Curser Error' TO SQL-MSG.
+           PERFORM 910-CHECK-SQL-CODE.
+      
+       735-FETCH-COMPONENTS.
+           EXEC SQL
+                FETCH COMPONENTS-CSR
+                INTO CSR-ENTITY,
+                CSR-DESCRIPTION,
+                CSR-SUBROUTINE,
+                CSR-LANG,
+                CSR-DB2-USAGE,
+                CSR-PROJECT
+                END-EXEC.
+           
+           MOVE 'Components SQL Fetch Curser Error' TO SQL-MSG.
+           PERFORM 910-CHECK-SQL-CODE.
+
+           IF SQLCODE IS EQUAL TO 100 THEN
+              MOVE 'Y' TO END-OF-COMPONENTS-CSR 
+           END-IF.
+
+           
 
        800-CLOSE-FILE.
            CLOSE IN-ICTO-PARM
